@@ -18,4 +18,4 @@ Download from github and run the iCloud-Extractor.py script
 
 ## Library's Used
 
-The following library, pyicloud, is included.  This is a copy of the repo   https://github.com/picklepete/pyicloud
+The following library, pyicloud, is included.  This is a copy of the repo https://github.com/picklepete/pyicloud with a minor addition to get the application information.
