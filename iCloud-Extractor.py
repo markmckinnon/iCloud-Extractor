@@ -1,5 +1,5 @@
 #
-# copy data from a persons iCloud account.
+# copy data from a persokns iCloud account.
 #
 # Copyright 2020 Mark McKinnon.
 # Contact: mark <dot> mckinnon <at> gmail <dot> com
@@ -61,18 +61,49 @@ driveTableName = "drive"
 driveTableColumns = "file_name text, file_size int, parent_path text, file_json text"
 driveSqlBindVals = "?, ?, ?, ?"
 
-def parseDrive(dirName, dirPath, SQLitedb):
+appNames = "dateCreated, drivewsid, docwsid, zone, name, type, maxDepth, supportedExtensions, supportedTypes, icons"
+appTableName = "installedApps"
+appTableColumns = "dateCreated text, drivewsid text, docwsid text, zone text, name text, type text, maxDepth text, supportedExtensions text, supportedTypes text, icons text"
+
+def parseApps(appLists, SQLitedb):
+    for appList in appLists:
+        #print (appList)
+        columnKeys = appList.keys()
+        columnValues = appList.values()
+        columnNames = ", ".join(columnKeys)
+        columnBindVariables = SQLitedb.create_question_bind_variables(len(columnKeys))
+        newColVals = []
+        for colVals in columnValues:
+            if isinstance(colVals, str):
+                newColVals.append(colVals)
+            elif isinstance(colVals, dict):
+                newColVals.append(json.dumps(colVals))
+            elif isinstance(colVals, list):
+                colV = []
+                for colv in colVals:
+                    if isinstance(colv, dict):
+                        colV.append(json.dumps(colv))
+                    else:
+                        colV.append(colv)
+                newColVals.append (", ".join(colV))
+            else:
+                newColVals = colVals
+        columnVal = ", ".join(newColVals)
+        SQLitedb.InsertBindValues(appTableName, columnNames, columnBindVariables, newColVals)
+
+def parseDrive(dirName, dirPath, SQLitedb, nodata):
     dirList = dirName.dir()
     for dir in dirList:
         driveList = dirName[dir]
         if driveList.type == 'folder' or driveList.type == 'app_library':
-            try:
-                os.makedirs(os.path.join(dirPath, driveList.name))
-            except FileExistsError:
-                pass
-            except:
-                print ("Error creating directory => " + os.path.join(dirPath, driveList.name))
-            parseDrive(dirName[driveList.name], os.path.join(dirPath, driveList.name), SQLitedb)
+            if nodata:
+                try:
+                    os.makedirs(os.path.join(dirPath, driveList.name))
+                except FileExistsError:
+                    pass
+                except:
+                    print ("Error creating directory => " + os.path.join(dirPath, driveList.name))
+            parseDrive(dirName[driveList.name], os.path.join(dirPath, driveList.name), SQLitedb, nodata)
             return
         else:
             drive = []
@@ -81,9 +112,10 @@ def parseDrive(dirName, dirPath, SQLitedb):
             drive.append(os.path.join(dirPath, dir))
             drive.append(json.dumps(driveList.data))
             SQLitedb.InsertBindValues(driveTableName, driveColumnNames, driveSqlBindVals, drive)
-            with driveList.open(stream=True) as response:
-                with open(os.path.join(dirPath, driveList.name), 'wb') as fileOut:
-                    copyfileobj(response.raw, fileOut)
+            if nodata:
+                with driveList.open(stream=True) as response:
+                    with open(os.path.join(dirPath, driveList.name), 'wb') as fileOut:
+                        copyfileobj(response.raw, fileOut)
 
 def createTables(SQLitedb, SQLiteDbName):
     SQLitedb.RemoveDB_File(SQLiteDbName)
@@ -95,6 +127,7 @@ def createTables(SQLitedb, SQLiteDbName):
     SQLitedb.CreateTable(eventTableName, eventTableColumns)
     SQLitedb.CreateTable(reminderTableName, reminderTableColumns)
     SQLitedb.CreateTable(driveTableName, driveTableColumns)
+    SQLitedb.CreateTable(appTableName, appTableColumns) 
 
 def parseDevices(SQLitedb, api):
     deviceList = api.devices._devices
@@ -221,6 +254,10 @@ def main(args):
 
 
 
+    print ("Adding Applications")
+    appLists = api.drive.app_list()
+    parseApps(appLists, SQLitedb)
+
     iPhoneList = api.iphone
     print ("Adding Devices")
     parseDevices(SQLitedb, api)
@@ -243,11 +280,12 @@ def main(args):
     for dir in dirList:
         driveList = api.drive[dir]
         if driveList.type == 'folder' or driveList.type == 'app_library':
-            try:
-                os.makedirs(os.path.join(driveDownloadDir, driveList.name))
-            except FileExistsError:
-                pass
-            parseDrive(driveList, os.path.join(driveDownloadDir, driveList.name), SQLitedb)
+            if args.nodata:
+                try:
+                    os.makedirs(os.path.join(driveDownloadDir, driveList.name))
+                except FileExistsError:
+                    pass
+            parseDrive(driveList, os.path.join(driveDownloadDir, driveList.name), SQLitedb, args.nodata)
         else:
             drive = []
             drive.append(driveList.name)
@@ -255,19 +293,21 @@ def main(args):
             drive.append(driveDownloadDir)
             drive.append(json.dumps(driveList.data))
             SQLitedb.InsertBindValues(driveTableName, driveColumnNames, driveSqlBindVals, drive)
-            with driveList.open(stream=True) as response:
-                with open(os.path.join(driveDownloadDir, driveList.name), 'wb') as fileOut:
-                    copyfileobj(response.raw, fileOut)
+            if args.nodata:
+                with driveList.open(stream=True) as response:
+                    with open(os.path.join(driveDownloadDir, driveList.name), 'wb') as fileOut:
+                        copyfileobj(response.raw, fileOut)
 
     # Not working as of this time, check out later
     #fileList = api.files
 
     print ("Adding Photos")
 
-    try:
-        os.makedirs(photoDownloadDir)
-    except FileExistsError:
-        pass
+    if args.nodata:
+        try:
+            os.makedirs(photoDownloadDir)
+        except FileExistsError:
+            pass
 
     albumList = api.photos.albums
     albumKeys = albumList.keys()
@@ -282,9 +322,10 @@ def main(args):
             photoList.append(json.dumps(photo._master_record))
             photoList.append(json.dumps(photo._asset_record))
             SQLitedb.InsertBindValues(photoTableName, photoColumnNames, photoSqlBindVals, photoList)
-            download = photo.download()
-            with open(os.path.join(photoDownloadDir, photo.filename), 'wb') as opened_file:
-                opened_file.write(download.raw.read())
+            if args.nodata:
+                download = photo.download()
+                with open(os.path.join(photoDownloadDir, photo.filename), 'wb') as opened_file:
+                    opened_file.write(download.raw.read())
 
     SQLitedb.Close()
 
@@ -305,6 +346,8 @@ if __name__ == '__main__':
                         help='itunes username')
     parser.add_argument('--password', metavar='password', required=True,
                         help='itunes user password')
+    parser.add_argument('--nodata', action='store_false', required=False,
+                        help='If no data is requested')
     args = parser.parse_args()
 
     main(args)
