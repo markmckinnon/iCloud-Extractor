@@ -4,7 +4,7 @@ This code will extract a users iCloud account information and store it on Disk. 
 
 - Device infromation
 - Account information
-- Contacts informationk
+- Contacts information
 - Event information
 - Reminder information
 - Application information
