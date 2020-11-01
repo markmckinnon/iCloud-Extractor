@@ -215,12 +215,20 @@ def parseAccounts(SQLitedb, api):
 
 
 def main(args):
-    driveDownloadDir = os.path.join(args.download, "Drive")
-    photoDownloadDir = os.path.join(args.download, "Photos")
-
-    SQLiteDbName = args.sqliteoutput
+    now = datetime.datetime.now()
+    currenttime = str(now.strftime('%Y-%m-%d_%A_%H%M%S'))
+    driveDownloadDir = os.path.join(args.download,'iCloud_Extraction_' + currenttime, 'Drive', )
+    photoDownloadDir = os.path.join(args.download, 'iCloud_Extraction_' + currenttime, 'Photos')
+    
+    SQLiteDbName = os.path.join(args.download, 'iCloud_Extraction_' + currenttime,'SQLite', 'metadata.db')
+    SQLiteDbDir = os.path.join(args.download, 'iCloud_Extraction_' + currenttime,'SQLite')
     itunesUserName = args.username
     itunesPassword = args.password
+    
+    os.makedirs(driveDownloadDir)
+    os.makedirs(photoDownloadDir)
+    os.makedirs(SQLiteDbDir)
+
 
     SQLitedb = SQLiteDb()
     createTables(SQLitedb, SQLiteDbName)
@@ -340,8 +348,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download information from an iCloud User Account:')
     parser.add_argument('--download', metavar='path', required=True,
                         help='Download Directory for photos and Drive')
-    parser.add_argument('--sqliteoutput', metavar='path', required=True,
-                        help='sqlite output database')
     parser.add_argument('--username', metavar='user name', required=True,
                         help='itunes username')
     parser.add_argument('--password', metavar='password', required=True,
